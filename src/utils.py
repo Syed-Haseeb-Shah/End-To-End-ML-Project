@@ -5,6 +5,8 @@ import sys
 from src.exception import CustomException
 import dill
 from sklearn.metrics import r2_score
+from sklearn.model_selection import GridSearchCV
+from src.logger import logging
 
 def save_object(file_path, obj):
     try:
@@ -17,20 +19,32 @@ def save_object(file_path, obj):
     except Exception as e:
         raise CustomException(e, sys)
 
-def evaluate_models(X_train, y_train, X_test, y_test, models):
+def evaluate_models(X_train, y_train, X_test, y_test, models, param):
     try:
         report = {}
-        for i in range(len(list(models))):
-            model = list(models.values())[i]
+        for model_name, model in models.items():
+            logging.info(f"Evaluating model: {model_name}")
+            if model_name in param:
+                para = param[model_name]
+                logging.info(f"Using parameters: {para}")
+                gs = GridSearchCV(model, para, cv=3)
+                gs.fit(X_train, y_train)
+                best_params = gs.best_params_
+                logging.info(f"Best parameters: {best_params}")
+                model.set_params(**best_params)
+            else:
+                logging.warning(f"No parameters found for model: {model_name}, using default settings.")
+
             model.fit(X_train, y_train)
-            
+
             y_train_pred = model.predict(X_train)
             y_test_pred = model.predict(X_test)
-            
+
             train_model_score = r2_score(y_train, y_train_pred)
             test_model_score = r2_score(y_test, y_test_pred)
-            
-            report[list(models.keys())[i]] = test_model_score
+
+            report[model_name] = test_model_score
+            logging.info(f"Model {model_name}: Train R2: {train_model_score}, Test R2: {test_model_score}")
 
         return report
     except Exception as e:
